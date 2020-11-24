@@ -9,7 +9,7 @@ from sqlalchemy import create_engine
 
 
 class Sql(object):
-    def __init__(self, filename="database.ini", section="postgresql"):
+    def __init__(self, database, host="localhost", port=5432, filename="database.ini", section="postgresql"):
         try:
             config = ConfigParser()
             file_path = os.path.realpath(__file__)
@@ -22,25 +22,28 @@ class Sql(object):
             module_path = filename
             config.read(os.path.join(project_path, module_path))
 
-        # Create and init connection
-        self.host = config[section]['host']
-        self.port = int(config[section]['port'])
-        self.user = config[section]['user']
-        self.pwd = config[section]['password']
-        self.db = config[section]['database']
+        # get connection parameters
+        self.host = host
+        self.port = port
+        # get authentication parameters
+        self.__user = config[section]['user']
+        self.__pwd = config[section]['password']
+        # get db and query
+        self.db = database
         self.query = config[section]['query']
 
-    def collectWithPsycopg2(self):
+    def collectWithPsycopg2(self, table_name):
         """
         Query data from SQL using psycopg2.
+        :param table_name: sql table to read.
         :return:
         """
         conn = None
         try:
             logging.info("Connecting to pgSql with psycopg2...")
-            conn = psycopg2.connect(dbname=self.db, user=self.user, password=self.pwd, host=self.host, port=self.port)
+            conn = psycopg2.connect(dbname=self.db, user=self.__user, password=self.__pwd, host=self.host, port=self.port)
             cur = conn.cursor()
-            cur.execute(self.query)
+            cur.execute(self.query.format(my_table=table_name))
             rows = cur.fetchall()
             cur.close()
             return rows
@@ -52,12 +55,12 @@ class Sql(object):
 
     def _initConnection(self):
         """
-        Initialize connection to sql using create engine.
+        Initialize connection to sql using create_engine.
         :return:
         """
         engine_string = "postgresql+psycopg2://{user}:{password}@{host}:{port}/{database}".format(
-            user=self.user,
-            password=self.pwd,
+            user=self.__user,
+            password=self.__pwd,
             host=self.host,
             port=self.port,
             database=self.db)
@@ -65,9 +68,10 @@ class Sql(object):
         # create sqlalchemy engine
         self.engine = create_engine(engine_string)
 
-    def collectDf(self):
+    def collectDf(self, table_name):
         """
         Function that collect data from sql using pd.read_sql_query and create_engine.
+        :param table_name: sql table to read.
         :return: a dataframe containing data from your request.
         """
         k = 0
@@ -76,7 +80,8 @@ class Sql(object):
                 logging.info('Trying to connect to db...')
                 self._initConnection()
                 logging.info('Trying to query data...')
-                return pd.read_sql_query(self.query, self.engine)  # see also pd.read_sql_table
+                query = self.query.format(my_table=table_name)
+                return pd.read_sql_query(query, self.engine)  # see also pd.read_sql_table
             except Exception as e:
                 logging.error('Error connecting/querying data -> ' + str(e))
                 time.sleep(120)
@@ -89,7 +94,7 @@ class Sql(object):
         """
         Function that writes a df to sql.
         :param df: df to write.
-        :param table_name: name of your sql table.
+        :param table_name: name of the sql table you want to write.
         :param if_exists: see https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_sql.html
         :param index: see above link.
         :return:
@@ -111,9 +116,7 @@ class Sql(object):
 
 
 if __name__ == "__main__":
-    pg = Sql()
-    data = pg.collectWithPsycopg2()
-    df = pg.collectDf()
-    myDfToWrite = pd.DataFrame(data={'first_column': ['Corentin']})
-    pg.dfToSql(myDfToWrite, 'first_table', if_exists='append', index=False)
+    pg = Sql(database="pg_sample_restaurants")
+    data = pg.collectWithPsycopg2(table_name="public.restaurants")
+    df = pg.collectDf(table_name="public.restaurants")
     logging.info('Success')

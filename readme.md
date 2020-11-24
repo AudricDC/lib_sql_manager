@@ -1,4 +1,4 @@
-# Lib Sql Retriever
+# Lib Sql Manager
 
 One library to connect to different SQL server, and make some basic requests using python.
 
@@ -12,16 +12,18 @@ See requirements.txt
 
 This script uses a file named database.ini. This file should look like this:
 
-```[postgresql]
-host=your_host_name
-database=db_name
+```
+[postgresql]
 user=user_name 
 password=one_secret_password
 query= An SQL request
-; for example : SELECT * FROM my_table
+; for example : query=SELECT * FROM {my_table}
 ```
 
-Note: default user is postgres and default port is 5432.
+Note: default user is postgres and default port is 5432 (see code).\
+Note2: The query must be somtehing that looks like SELECT ... FROM {my_table}. To specify a table name, 
+you have to do it in collectDf and collectWithPsycopg2 methods.
+
 
 ## Script description
 
